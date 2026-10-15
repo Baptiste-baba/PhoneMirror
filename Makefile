@@ -1,28 +1,25 @@
-PROJECT := PhoneMirror.xcodeproj
-SCHEME  := PhoneMirror
+NAME    := PhoneMirror
+PROJECT := $(NAME).xcodeproj
 DERIVED := build/DerivedData
-APP     := $(DERIVED)/Build/Products/Debug/PhoneMirror.app
+APP     := $(DERIVED)/Build/Products/Debug/$(NAME).app
 
-.PHONY: generate build run test clean open
+.PHONY: generate build run clean open
 
-## Generate the Xcode project from project.yml.
+## Generate the Xcode project from project.yml (skipped when nothing changed).
 generate:
-	xcodegen generate --quiet
+	xcodegen generate --quiet --use-cache
 
 ## Build the Debug app.
 build: generate
-	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Debug \
+	xcodebuild -project $(PROJECT) -scheme $(NAME) -configuration Debug \
 		-derivedDataPath $(DERIVED) -destination "platform=macOS,arch=$(shell uname -m)" -quiet build
 
-## Build and launch the app.
+## Build and launch the app, replacing any running instance.
 ## `open` (rather than running the binary directly) makes macOS attribute the
-## camera permission to PhoneMirror itself instead of your terminal or VSCode.
+## camera permission to the app itself instead of your terminal or VSCode.
 run: build
+	pkill -x $(NAME) || true
 	open $(APP)
-
-## Run the MirrorKit unit tests.
-test:
-	swift test --package-path Packages/MirrorKit
 
 ## Remove build products and the generated project.
 clean:

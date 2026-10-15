@@ -5,9 +5,12 @@
 // Reverse-DNS prefix of the bundle identifier. Forks should override it in Local.xcconfig.
 BUNDLE_ID_PREFIX = io.github.baptiste-baba
 
+// Signing lives here only, so that Local.xcconfig can override any of it.
 // Ad hoc signing by default, so the project builds without an Apple account.
 // Note: macOS ties the camera permission to the code signature, so with ad hoc
 // signing the permission prompt may come back after each rebuild.
+CODE_SIGN_STYLE = Automatic
 CODE_SIGN_IDENTITY = -
+ENABLE_HARDENED_RUNTIME = YES
 
 #include? "Local.xcconfig"

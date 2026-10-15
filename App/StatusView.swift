@@ -6,20 +6,7 @@ struct StatusView: View {
     let state: ConnectionState
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: symbolName)
-                .font(.system(size: 44, weight: .light))
-            Text(title)
-                .font(.title3.weight(.semibold))
-            if let hint {
-                Text(hint)
-                    .font(.callout)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .foregroundStyle(.white)
-        .padding(24)
+        ContentUnavailableView(title, systemImage: symbolName, description: hint.map(Text.init))
     }
 
     private var symbolName: String {

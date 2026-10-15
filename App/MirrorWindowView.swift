@@ -9,9 +9,9 @@ struct MirrorWindowView: View {
 
     var body: some View {
         StatusView(state: state)
-            .frame(minWidth: 240, minHeight: 320)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 240, maxWidth: .infinity, minHeight: 320, maxHeight: .infinity)
             .background(.black)
+            .environment(\.colorScheme, .dark)
     }
 }
 

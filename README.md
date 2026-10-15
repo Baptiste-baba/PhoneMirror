@@ -37,7 +37,6 @@ make run
 | `make run` | Generate the Xcode project, build and launch the app |
 | `make build` | Build only |
 | `make open` | Open the generated project in Xcode |
-| `make test` | Run the unit tests |
 | `make clean` | Remove build products and the generated project |
 
 ## Project layout
