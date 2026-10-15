@@ -5,8 +5,22 @@ import Video
 struct StatusView: View {
     let state: ConnectionState
 
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
-        ContentUnavailableView(title, systemImage: symbolName, description: hint.map(Text.init))
+        ContentUnavailableView {
+            Label(title, systemImage: symbolName)
+        } description: {
+            if let hint {
+                Text(hint)
+            }
+        } actions: {
+            if state == .waitingForAuthorization(.cameraAccessDenied) {
+                Button("Ouvrir les Réglages Système") {
+                    openURL(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!)
+                }
+            }
+        }
     }
 
     private var symbolName: String {
@@ -33,6 +47,8 @@ struct StatusView: View {
             "Autorisez PhoneMirror à utiliser la caméra pour afficher l'écran de l'iPhone."
         case .waitingForAuthorization(.cameraAccessDenied):
             "Autorisez PhoneMirror dans Réglages Système › Confidentialité et sécurité › Caméra."
+        case .waitingForAuthorization(.cameraAccessRestricted):
+            "L'accès à la caméra est bloqué sur ce Mac par un profil de gestion ou le contrôle parental."
         case .waitingForAuthorization(.deviceNotReady):
             "Déverrouillez votre iPhone et touchez « Se fier » si la question s'affiche."
         case .connected:

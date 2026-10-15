@@ -5,22 +5,23 @@ import os
 /// Tracks the iPhone exposed as a capture device, as it is plugged in and out.
 @MainActor
 @Observable
-public final class CaptureDeviceMonitor {
+final class CaptureDeviceMonitor {
     /// The iPhone currently available for screen capture, if any.
     /// With several iPhones plugged in, the one in use stays selected until
     /// it is unplugged.
     private(set) var device: AVCaptureDevice?
 
-    public var deviceName: String? { device?.localizedName }
+    var deviceName: String? { device?.localizedName }
+
+    /// Called after `device` changes.
+    @ObservationIgnored var onDeviceChange: (() -> Void)?
 
     @ObservationIgnored private var discovery: AVCaptureDevice.DiscoverySession?
     @ObservationIgnored private var devicesObservation: NSKeyValueObservation?
     @ObservationIgnored private var startDate: Date?
 
-    public init() {}
-
     /// Starts watching for iPhones. Calling it again has no effect.
-    public func start() {
+    func start() {
         guard discovery == nil else { return }
         startDate = .now
 
@@ -60,5 +61,6 @@ public final class CaptureDeviceMonitor {
                 """)
         }
         device = current
+        onDeviceChange?()
     }
 }
