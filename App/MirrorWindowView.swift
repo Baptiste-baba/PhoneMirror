@@ -28,7 +28,10 @@ struct MirrorWindowView: View {
                 StatusView(state: connection.state)
                     .padding()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background { BlurredScreenView(snapshot: mirror.lastSnapshot) }
+                    .background {
+                        BlurredScreenView(snapshot: mirror.lastSnapshot)
+                            .overlay(WindowDragArea())
+                    }
             }
         }
         .ignoresSafeArea()
