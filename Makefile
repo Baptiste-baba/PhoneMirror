@@ -3,7 +3,7 @@ PROJECT := $(NAME).xcodeproj
 DERIVED := build/DerivedData
 APP     := $(DERIVED)/Build/Products/Debug/$(NAME).app
 
-.PHONY: generate build run clean open
+.PHONY: generate build run logs clean open
 
 ## Generate the Xcode project from project.yml (skipped when nothing changed).
 generate:
@@ -20,6 +20,11 @@ build: generate
 run: build
 	pkill -x $(NAME) || true
 	open $(APP)
+
+## Stream the app's logs (full path: zsh has a `log` builtin).
+logs:
+	/usr/bin/log stream --style compact --level info \
+		--predicate 'subsystem == "$(shell xcodebuild -project $(PROJECT) -showBuildSettings 2>/dev/null | awk '/ PRODUCT_BUNDLE_IDENTIFIER =/ { print $$3 }')"'
 
 ## Remove build products and the generated project.
 clean:
