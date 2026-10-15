@@ -2,8 +2,8 @@
 // Machine-specific values (signing team, bundle ID prefix) go in Local.xcconfig,
 // which is not versioned. See Local.xcconfig.example.
 
-// Reverse-DNS prefix of the bundle identifier. Override it in Local.xcconfig.
-BUNDLE_ID_PREFIX = io.github.CHANGEME
+// Reverse-DNS prefix of the bundle identifier. Forks should override it in Local.xcconfig.
+BUNDLE_ID_PREFIX = io.github.baptiste-baba
 
 // Ad hoc signing by default, so the project builds without an Apple account.
 // Note: macOS ties the camera permission to the code signature, so with ad hoc
