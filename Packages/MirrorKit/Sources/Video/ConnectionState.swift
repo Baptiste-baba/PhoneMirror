@@ -1,3 +1,5 @@
+import AVFoundation
+
 /// What the app can currently show the user about the iPhone.
 public enum ConnectionState: Equatable, Sendable {
     /// No iPhone is plugged in.
@@ -15,6 +17,9 @@ public enum ConnectionState: Equatable, Sendable {
         case cameraAccessNotDetermined
         /// Camera access was refused in System Settings.
         case cameraAccessDenied
+        /// Camera access is blocked by a configuration profile or parental
+        /// controls, which the user cannot change.
+        case cameraAccessRestricted
         /// The iPhone is plugged in but not exposed as a capture device,
         /// most likely because it does not trust this Mac yet. A locked iPhone
         /// that already trusts this Mac is still exposed.
@@ -28,16 +33,18 @@ extension ConnectionState {
     ///   - isPhonePluggedIn: Whether an iPhone is seen on USB, ready or not.
     ///   - cameraAccess: Only matters once there is a screen to show, so the
     ///     user is not bothered about it before plugging an iPhone in.
-    init(captureDeviceName: String?, isPhonePluggedIn: Bool, cameraAccess: CameraAccess) {
-        switch (captureDeviceName, cameraAccess) {
-        case (let name?, .granted):
-            self = .connected(deviceName: name)
-        case (.some, .notDetermined):
-            self = .waitingForAuthorization(.cameraAccessNotDetermined)
-        case (.some, .denied):
-            self = .waitingForAuthorization(.cameraAccessDenied)
-        case (nil, _):
+    ///     The iPhone screen is a capture device, so it falls under the camera permission.
+    init(captureDeviceName: String?, isPhonePluggedIn: Bool, cameraAccess: AVAuthorizationStatus) {
+        guard let captureDeviceName else {
             self = isPhonePluggedIn ? .waitingForAuthorization(.deviceNotReady) : .noDevice
+            return
+        }
+        switch cameraAccess {
+        case .authorized: self = .connected(deviceName: captureDeviceName)
+        case .notDetermined: self = .waitingForAuthorization(.cameraAccessNotDetermined)
+        case .restricted: self = .waitingForAuthorization(.cameraAccessRestricted)
+        case .denied: self = .waitingForAuthorization(.cameraAccessDenied)
+        @unknown default: self = .waitingForAuthorization(.cameraAccessDenied)
         }
     }
 }

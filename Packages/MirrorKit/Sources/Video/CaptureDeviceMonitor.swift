@@ -13,11 +13,12 @@ final class CaptureDeviceMonitor {
 
     var deviceName: String? { device?.localizedName }
 
+    /// Called after `device` changes.
+    @ObservationIgnored var onDeviceChange: (() -> Void)?
+
     @ObservationIgnored private var discovery: AVCaptureDevice.DiscoverySession?
     @ObservationIgnored private var devicesObservation: NSKeyValueObservation?
     @ObservationIgnored private var startDate: Date?
-
-    init() {}
 
     /// Starts watching for iPhones. Calling it again has no effect.
     func start() {
@@ -60,5 +61,6 @@ final class CaptureDeviceMonitor {
                 """)
         }
         device = current
+        onDeviceChange?()
     }
 }

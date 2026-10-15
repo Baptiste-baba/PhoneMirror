@@ -47,6 +47,8 @@ struct StatusView: View {
             "Autorisez PhoneMirror à utiliser la caméra pour afficher l'écran de l'iPhone."
         case .waitingForAuthorization(.cameraAccessDenied):
             "Autorisez PhoneMirror dans Réglages Système › Confidentialité et sécurité › Caméra."
+        case .waitingForAuthorization(.cameraAccessRestricted):
+            "L'accès à la caméra est bloqué sur ce Mac par un profil de gestion ou le contrôle parental."
         case .waitingForAuthorization(.deviceNotReady):
             "Déverrouillez votre iPhone et touchez « Se fier » si la question s'affiche."
         case .connected:

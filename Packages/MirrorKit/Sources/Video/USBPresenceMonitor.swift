@@ -6,16 +6,24 @@ import os
 
 /// Tells whether an iPhone is physically plugged in over USB, even when it
 /// does not expose its screen yet (typically: not trusting this Mac).
-///
-/// Lives for the whole app session: notifications are never torn down.
 @MainActor
 @Observable
 final class USBPresenceMonitor {
-    private(set) var isPhonePluggedIn = false
+    var isPhonePluggedIn: Bool { !phoneRegistryIDs.isEmpty }
 
-    @ObservationIgnored private var notificationPort: IONotificationPortRef?
-    @ObservationIgnored private var iterators: [io_iterator_t] = []
-    @ObservationIgnored private var phoneRegistryIDs: Set<UInt64> = []
+    private var phoneRegistryIDs: Set<UInt64> = []
+
+    // Only touched on the main queue, and in deinit once nothing else can.
+    @ObservationIgnored private nonisolated(unsafe) var notificationPort: IONotificationPortRef?
+    @ObservationIgnored private nonisolated(unsafe) var iterators: [io_iterator_t] = []
+
+    deinit {
+        // Destroying the port stops the callbacks, which point to this instance.
+        iterators.forEach { IOObjectRelease($0) }
+        if let notificationPort {
+            IONotificationPortDestroy(notificationPort)
+        }
+    }
 
     /// Starts watching USB devices. Calling it again has no effect.
     func start() {
@@ -24,63 +32,64 @@ final class USBPresenceMonitor {
         IONotificationPortSetDispatchQueue(port, .main)
         notificationPort = port
 
-        let context = Unmanaged.passUnretained(self).toOpaque()
-        for (notification, isArrival) in [(kIOFirstMatchNotification, true), (kIOTerminatedNotification, false)] {
-            var iterator: io_iterator_t = 0
-            IOServiceAddMatchingNotification(
-                port,
-                notification,
-                Self.appleUSBDevices(),
-                isArrival ? Self.devicesArrived : Self.devicesLeft,
-                context,
-                &iterator
-            )
-            iterators.append(iterator)
-            // Draining the iterator handles devices already plugged in and arms the notification.
-            update(from: iterator, isArrival: isArrival)
+        let arrivals = register(kIOFirstMatchNotification, on: port) { context, iterator in
+            let monitor = USBPresenceMonitor.monitor(from: context)
+            MainActor.assumeIsolated { monitor.phonesArrived(iterator) }
         }
+        let removals = register(kIOTerminatedNotification, on: port) { context, iterator in
+            let monitor = USBPresenceMonitor.monitor(from: context)
+            MainActor.assumeIsolated { monitor.phonesLeft(iterator) }
+        }
+        iterators = [arrivals, removals]
+
+        // Draining the iterators handles iPhones already plugged in and arms the notifications.
+        phonesArrived(arrivals)
+        phonesLeft(removals)
     }
 
-    // IOKit calls these on the main queue, set as the port's dispatch queue in `start()`.
-    private static let devicesArrived: IOServiceMatchingCallback = { context, iterator in
-        let monitor = monitor(from: context)
-        MainActor.assumeIsolated { monitor.update(from: iterator, isArrival: true) }
-    }
-
-    private static let devicesLeft: IOServiceMatchingCallback = { context, iterator in
-        let monitor = monitor(from: context)
-        MainActor.assumeIsolated { monitor.update(from: iterator, isArrival: false) }
+    private func register(
+        _ notification: String,
+        on port: IONotificationPortRef?,
+        callback: IOServiceMatchingCallback
+    ) -> io_iterator_t {
+        // Plain property matching: USB matching rules ignore a vendor ID
+        // given without a product ID.
+        let matching = IOServiceMatching(kIOUSBHostDeviceClassName) as NSMutableDictionary
+        matching[kIOPropertyMatchKey] = [
+            kUSBHostMatchingPropertyVendorID: kIOUSBAppleVendorID,
+            kUSBHostDevicePropertyProductString: "iPhone",
+        ]
+        var iterator: io_iterator_t = 0
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        IOServiceAddMatchingNotification(port, notification, matching, callback, context, &iterator)
+        return iterator
     }
 
     private nonisolated static func monitor(from context: UnsafeMutableRawPointer?) -> USBPresenceMonitor {
         Unmanaged<USBPresenceMonitor>.fromOpaque(context!).takeUnretainedValue()
     }
 
-    private static func appleUSBDevices() -> CFMutableDictionary {
-        let matching = IOServiceMatching(kIOUSBHostDeviceClassName) as NSMutableDictionary
-        // Plain property matching: USB matching rules ignore a vendor ID
-        // given without a product ID.
-        matching[kIOPropertyMatchKey] = [kUSBVendorID: 0x05AC]  // Apple
-        return matching
+    private func phonesArrived(_ iterator: io_iterator_t) {
+        for registryID in Self.drain(iterator) where phoneRegistryIDs.insert(registryID).inserted {
+            Logger.video.info("iPhone plugged in over USB")
+        }
     }
 
-    private func update(from iterator: io_iterator_t, isArrival: Bool) {
+    private func phonesLeft(_ iterator: io_iterator_t) {
+        for registryID in Self.drain(iterator) where phoneRegistryIDs.remove(registryID) != nil {
+            Logger.video.info("iPhone unplugged from USB")
+        }
+    }
+
+    /// Returns the registry IDs of the services in the iterator, releasing them.
+    private static func drain(_ iterator: io_iterator_t) -> [UInt64] {
+        var registryIDs: [UInt64] = []
         while case let service = IOIteratorNext(iterator), service != IO_OBJECT_NULL {
-            defer { IOObjectRelease(service) }
             var registryID: UInt64 = 0
             IORegistryEntryGetRegistryEntryID(service, &registryID)
-
-            if isArrival {
-                let productName = IORegistryEntryCreateCFProperty(
-                    service, kUSBProductString as CFString, kCFAllocatorDefault, 0
-                )?.takeRetainedValue() as? String
-                guard productName == "iPhone" else { continue }
-                phoneRegistryIDs.insert(registryID)
-                Logger.video.info("iPhone plugged in over USB")
-            } else if phoneRegistryIDs.remove(registryID) != nil {
-                Logger.video.info("iPhone unplugged from USB")
-            }
+            registryIDs.append(registryID)
+            IOObjectRelease(service)
         }
-        isPhonePluggedIn = !phoneRegistryIDs.isEmpty
+        return registryIDs
     }
 }
