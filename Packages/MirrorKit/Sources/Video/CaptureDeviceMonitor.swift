@@ -7,7 +7,8 @@ import os
 @Observable
 public final class CaptureDeviceMonitor {
     /// The iPhone currently available for screen capture, if any.
-    /// With several iPhones plugged in, the first one found is used.
+    /// With several iPhones plugged in, the one in use stays selected until
+    /// it is unplugged.
     private(set) var device: AVCaptureDevice?
 
     public var deviceName: String? { device?.localizedName }
@@ -43,9 +44,13 @@ public final class CaptureDeviceMonitor {
     }
 
     private func refresh() {
-        let current = discovery?.devices.first
+        let available = discovery?.devices ?? []
+        let current = available.first { $0.uniqueID == device?.uniqueID } ?? available.first
         guard current?.uniqueID != device?.uniqueID else { return }
 
+        if let device {
+            Logger.video.info("iPhone disconnected: \(device.localizedName, privacy: .private)")
+        }
         if let current {
             let delay = startDate.map { Date.now.timeIntervalSince($0) } ?? 0
             Logger.video.info("""
@@ -53,8 +58,6 @@ public final class CaptureDeviceMonitor {
                 (model \(current.modelID, privacy: .public)), \
                 \(delay, format: .fixed(precision: 1), privacy: .public) s after start
                 """)
-        } else if let device {
-            Logger.video.info("iPhone disconnected: \(device.localizedName, privacy: .private)")
         }
         device = current
     }

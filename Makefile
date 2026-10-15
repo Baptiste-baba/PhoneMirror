@@ -18,13 +18,13 @@ build: generate
 ## `open` (rather than running the binary directly) makes macOS attribute the
 ## camera permission to the app itself instead of your terminal or VSCode.
 run: build
-	pkill -x $(NAME) || true
+	-@pkill -x $(NAME); while pgrep -qx $(NAME); do sleep 0.1; done
 	open $(APP)
 
 ## Stream the app's logs (full path: zsh has a `log` builtin).
-logs:
+logs: generate
 	/usr/bin/log stream --style compact --level info \
-		--predicate 'subsystem == "$(shell xcodebuild -project $(PROJECT) -showBuildSettings 2>/dev/null | awk '/ PRODUCT_BUNDLE_IDENTIFIER =/ { print $$3 }')"'
+		--predicate 'subsystem == "$(shell xcodebuild -project $(PROJECT) -scheme $(NAME) -showBuildSettings 2>/dev/null | awk '/ PRODUCT_BUNDLE_IDENTIFIER =/ { print $$3 }')"'
 
 ## Remove build products and the generated project.
 clean:
