@@ -1,0 +1,10 @@
+// Copy this file to Config/Local.xcconfig (ignored by git) and fill in your values.
+
+// Your own reverse-DNS prefix, e.g. io.github.<your-github-username>.
+BUNDLE_ID_PREFIX = io.github.your-username
+
+// Sign with your (free) Apple Development certificate so macOS remembers the
+// camera permission across rebuilds. Your Team ID is shown in Xcode > Settings >
+// Accounts, or in Keychain Access next to "Apple Development: …".
+// DEVELOPMENT_TEAM = XXXXXXXXXX
+// CODE_SIGN_IDENTITY = Apple Development

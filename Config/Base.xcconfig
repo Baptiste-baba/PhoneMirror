@@ -1,0 +1,13 @@
+// Shared build settings for every configuration.
+// Machine-specific values (signing team, bundle ID prefix) go in Local.xcconfig,
+// which is not versioned. See Local.xcconfig.example.
+
+// Reverse-DNS prefix of the bundle identifier. Override it in Local.xcconfig.
+BUNDLE_ID_PREFIX = io.github.CHANGEME
+
+// Ad hoc signing by default, so the project builds without an Apple account.
+// Note: macOS ties the camera permission to the code signature, so with ad hoc
+// signing the permission prompt may come back after each rebuild.
+CODE_SIGN_IDENTITY = -
+
+#include? "Local.xcconfig"
