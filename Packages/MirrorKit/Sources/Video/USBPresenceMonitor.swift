@@ -5,7 +5,7 @@ import Observation
 import os
 
 /// Tells whether an iPhone is physically plugged in over USB, even when it
-/// does not expose its screen yet (locked, or not trusting this Mac).
+/// does not expose its screen yet (typically: not trusting this Mac).
 ///
 /// Lives for the whole app session: notifications are never torn down.
 @MainActor

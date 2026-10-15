@@ -8,7 +8,7 @@ struct ConnectionStateTests {
         (nil, false, CameraAccess.notDetermined, ConnectionState.noDevice),
         (nil, false, .denied, .noDevice),
         (nil, false, .granted, .noDevice),
-        // Plugged in, but the screen is not exposed (locked or untrusted).
+        // Plugged in, but the screen is not exposed (not trusting this Mac yet).
         (nil, true, .granted, .waitingForAuthorization(.deviceNotReady)),
         (nil, true, .denied, .waitingForAuthorization(.deviceNotReady)),
         // Screen exposed: camera access decides.

@@ -16,7 +16,8 @@ public enum ConnectionState: Equatable, Sendable {
         /// Camera access was refused in System Settings.
         case cameraAccessDenied
         /// The iPhone is plugged in but not exposed as a capture device,
-        /// most likely because it is locked or does not trust this Mac yet.
+        /// most likely because it does not trust this Mac yet. A locked iPhone
+        /// that already trusts this Mac is still exposed.
         case deviceNotReady
     }
 }
