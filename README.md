@@ -4,7 +4,7 @@ A native, open source macOS app to see and use your iPhone from your Mac, over U
 
 Apple's iPhone Mirroring is not available in the European Union. PhoneMirror aims to be an everyday alternative: a real Mac app you open and that just works, with smooth video and natural input. It is not a testing or automation tool.
 
-> **Status: early development.** The live video of the iPhone screen works. You can see your iPhone but not control it yet: tap and swipe come in v0.2.
+> **Status: early development.** v0.1 is done: the live video of the iPhone screen works. You can see your iPhone but not control it yet: tap and swipe come in v0.2.
 
 ## How it works
 
@@ -35,7 +35,7 @@ The window is just the iPhone screen, with its rounded corners and Dynamic Islan
 
 ## Roadmap
 
-- [ ] **v0.1**: show the iPhone screen in a Mac window (video only)
+- [x] **v0.1**: show the iPhone screen in a Mac window (video only)
 - [ ] **v0.2**: tap and swipe
 - [ ] **v0.3**: keyboard, scrolling, system buttons (Home, App Switcher, Lock)
 - [ ] **v1.0**: guided setup and demo
