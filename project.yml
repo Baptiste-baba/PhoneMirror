@@ -40,4 +40,7 @@ targets:
         INFOPLIST_KEY_NSCameraUsageDescription: >-
           PhoneMirror a besoin de cet accès pour afficher l'écran de votre iPhone
           branché en USB. Aucune image n'est enregistrée ni envoyée.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: >-
+          PhoneMirror a besoin de cet accès pour faire entendre sur ce Mac le son
+          de votre iPhone. Aucun son n'est enregistré ni envoyé.
     scheme: {}

@@ -1,17 +1,31 @@
 import SwiftUI
-import Video
 
 @main
 struct PhoneMirrorApp: App {
-    // Owned by the app rather than the window: the app keeps running when the
-    // window is closed, and reopening it must find the same connection.
-    @State private var connection = ConnectionMonitor()
+    @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
+    @AppStorage("showsDebugInfo") private var showsDebugInfo = false
+    @AppStorage("playsAudioOnMac") private var playsAudioOnMac = true
 
     var body: some Scene {
-        Window("PhoneMirror", id: "mirror") {
-            MirrorWindowView(connection: connection)
+        // The window is created by `AppDelegate`: this scene only provides
+        // the menu bar.
+        Settings {
+            EmptyView()
         }
-        .defaultSize(width: 360, height: 740)
-        .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(replacing: .appSettings) {}
+            CommandGroup(replacing: .saveItem) {
+                Button("Fermer") { NSApp.keyWindow?.performClose(nil) }
+                    .keyboardShortcut("w")
+            }
+            CommandGroup(after: .toolbar) {
+                Toggle("Son de l'iPhone sur le Mac", isOn: $playsAudioOnMac)
+                Toggle("Infos de débogage", isOn: $showsDebugInfo)
+                    .keyboardShortcut("d", modifiers: [.command, .option])
+            }
+        }
+        .onChange(of: playsAudioOnMac, initial: true) { _, onMac in
+            appDelegate.connection.mirror.playAudio(onMac: onMac)
+        }
     }
 }

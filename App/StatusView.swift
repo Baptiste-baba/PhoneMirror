@@ -8,11 +8,14 @@ struct StatusView: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
+        // Only the actions take clicks: elsewhere, dragging moves the window.
         ContentUnavailableView {
             Label(title, systemImage: symbolName)
+                .allowsHitTesting(false)
         } description: {
             if let hint {
                 Text(hint)
+                    .allowsHitTesting(false)
             }
         } actions: {
             if state == .waitingForAuthorization(.cameraAccessDenied) {

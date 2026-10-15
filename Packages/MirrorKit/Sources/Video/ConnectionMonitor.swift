@@ -3,10 +3,13 @@ import AVFoundation
 import Observation
 import os
 
-/// Combines everything the app knows about the iPhone into one `ConnectionState`.
+/// Combines everything the app knows about the iPhone into one `ConnectionState`,
+/// and mirrors the iPhone screen whenever the state is `.connected`.
 @MainActor
 @Observable
 public final class ConnectionMonitor {
+    public let mirror = MirrorSession()
+
     private let captureDevices = CaptureDeviceMonitor()
     private let usbPresence = USBPresenceMonitor()
     private var cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
@@ -34,13 +37,14 @@ public final class ConnectionMonitor {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
+                self?.cameraAccessChanged()
             }
         }
 
         // Asks for camera access only once there is an iPhone screen to show.
         captureDevices.onDeviceChange = { [weak self] in
             self?.requestCameraAccessIfNeeded()
+            self?.updateMirror()
         }
 
         usbPresence.start()
@@ -51,8 +55,21 @@ public final class ConnectionMonitor {
         guard captureDevices.device != nil, cameraAccess == .notDetermined else { return }
         Task {
             await AVCaptureDevice.requestAccess(for: .video)
-            cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
+            cameraAccessChanged()
             Logger.video.info("Camera access after prompt: \(self.cameraAccess.rawValue, privacy: .public)")
+        }
+    }
+
+    private func cameraAccessChanged() {
+        cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
+        updateMirror()
+    }
+
+    private func updateMirror() {
+        if case .connected = state {
+            mirror.show(captureDevices.device)
+        } else {
+            mirror.show(nil)
         }
     }
 }
