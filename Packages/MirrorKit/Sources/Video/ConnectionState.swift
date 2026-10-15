@@ -20,3 +20,23 @@ public enum ConnectionState: Equatable, Sendable {
         case deviceNotReady
     }
 }
+
+extension ConnectionState {
+    /// - Parameters:
+    ///   - captureDeviceName: The iPhone exposed as a capture device, if any.
+    ///   - isPhonePluggedIn: Whether an iPhone is seen on USB, ready or not.
+    ///   - cameraAccess: Only matters once there is a screen to show, so the
+    ///     user is not bothered about it before plugging an iPhone in.
+    init(captureDeviceName: String?, isPhonePluggedIn: Bool, cameraAccess: CameraAccess) {
+        switch (captureDeviceName, cameraAccess) {
+        case (let name?, .granted):
+            self = .connected(deviceName: name)
+        case (.some, .notDetermined):
+            self = .waitingForAuthorization(.cameraAccessNotDetermined)
+        case (.some, .denied):
+            self = .waitingForAuthorization(.cameraAccessDenied)
+        case (nil, _):
+            self = isPhonePluggedIn ? .waitingForAuthorization(.deviceNotReady) : .noDevice
+        }
+    }
+}

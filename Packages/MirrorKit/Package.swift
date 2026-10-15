@@ -14,5 +14,6 @@ let package = Package(
     targets: [
         .target(name: "Video"),
         .target(name: "Control"),
+        .testTarget(name: "VideoTests", dependencies: ["Video"]),
     ]
 )

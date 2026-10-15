@@ -5,8 +5,22 @@ import Video
 struct StatusView: View {
     let state: ConnectionState
 
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
-        ContentUnavailableView(title, systemImage: symbolName, description: hint.map(Text.init))
+        ContentUnavailableView {
+            Label(title, systemImage: symbolName)
+        } description: {
+            if let hint {
+                Text(hint)
+            }
+        } actions: {
+            if state == .waitingForAuthorization(.cameraAccessDenied) {
+                Button("Ouvrir les Réglages Système") {
+                    openURL(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!)
+                }
+            }
+        }
     }
 
     private var symbolName: String {
