@@ -5,11 +5,8 @@ import Video
 /// while there is nothing to show.
 struct MirrorWindowView: View {
     let connection: ConnectionMonitor
-    /// Called with the screen's size, so the window can take its proportions.
-    let onScreenSizeChange: (CGSize) -> Void
 
     @AppStorage("showsDebugInfo") private var showsDebugInfo = false
-    @AppStorage("playsAudioOnMac") private var playsAudioOnMac = true
 
     private var mirror: MirrorSession { connection.mirror }
 
@@ -17,17 +14,8 @@ struct MirrorWindowView: View {
         if case .connected = connection.state, mirror.videoSize != nil { true } else { false }
     }
 
-    /// Keeps the shape of the last iPhone seen while there is no video.
-    private var screenGeometry: ScreenGeometry {
-        if let size = (isShowingVideo ? mirror.videoSize : nil) ?? mirror.lastScreenSize {
-            ScreenGeometry(videoSize: size)
-        } else {
-            .placeholder
-        }
-    }
-
     var body: some View {
-        PhoneScreenView(geometry: screenGeometry) {
+        PhoneScreenView(geometry: mirror.screenGeometry) {
             if isShowingVideo {
                 VideoView(session: mirror)
                     .overlay(alignment: .bottom) {
@@ -43,16 +31,8 @@ struct MirrorWindowView: View {
                     .background { BlurredScreenView(snapshot: mirror.lastSnapshot) }
             }
         }
-        .frame(minWidth: 160, maxWidth: .infinity, minHeight: 160, maxHeight: .infinity)
         .ignoresSafeArea()
         .environment(\.colorScheme, .dark)
-        .onAppear { connection.start() }
-        .onChange(of: screenGeometry.size, initial: true) { _, size in
-            onScreenSizeChange(size)
-        }
-        .onChange(of: playsAudioOnMac, initial: true) { _, onMac in
-            mirror.playAudio(onMac: onMac)
-        }
     }
 }
 
@@ -102,5 +82,5 @@ private struct DebugInfoView: View {
 }
 
 #Preview {
-    MirrorWindowView(connection: ConnectionMonitor()) { _ in }
+    MirrorWindowView(connection: ConnectionMonitor())
 }

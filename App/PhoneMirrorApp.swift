@@ -24,5 +24,8 @@ struct PhoneMirrorApp: App {
                     .keyboardShortcut("d", modifiers: [.command, .option])
             }
         }
+        .onChange(of: playsAudioOnMac, initial: true) { _, onMac in
+            appDelegate.connection.mirror.playAudio(onMac: onMac)
+        }
     }
 }

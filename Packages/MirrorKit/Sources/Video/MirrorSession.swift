@@ -18,6 +18,11 @@ public final class MirrorSession {
     public private(set) var lastScreenSize: CGSize?
     public private(set) var lastSnapshot: CGImage?
 
+    /// Shape of the iPhone screen, which outlives the video like `lastScreenSize`.
+    public var screenGeometry: ScreenGeometry {
+        lastScreenSize.map(ScreenGeometry.init(videoSize:)) ?? .placeholder
+    }
+
     let displayLayer = AVSampleBufferDisplayLayer()
 
     @ObservationIgnored private var pipeline: CapturePipeline!

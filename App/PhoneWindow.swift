@@ -1,4 +1,5 @@
 import AppKit
+import Observation
 import SwiftUI
 import Video
 
@@ -22,13 +23,13 @@ final class PhoneWindow: NSWindow {
         hasShadow = true
         isMovableByWindowBackground = true
         isReleasedWhenClosed = false
-        let hostingView = NSHostingView(rootView: MirrorWindowView(connection: connection) { [weak self] size in
-            // Resizing the window while SwiftUI updates the view is not allowed.
-            DispatchQueue.main.async { self?.fit(aspectRatio: size) }
-        })
+        let hostingView = NSHostingView(rootView: MirrorWindowView(connection: connection))
+        // The window's size is set here only, not from the SwiftUI content.
+        hostingView.sizingOptions = []
         contentView = ResizingView(content: hostingView)
         center()
         setFrameAutosaveName("mirror")
+        followScreenShape(of: connection.mirror)
     }
 
     override var canBecomeKey: Bool { true }
@@ -41,6 +42,18 @@ final class PhoneWindow: NSWindow {
 
     override func performMiniaturize(_ sender: Any?) {
         miniaturize(sender)
+    }
+
+    /// Keeps the window at the screen's proportions as the iPhone rotates or
+    /// another model is plugged in.
+    private func followScreenShape(of mirror: MirrorSession) {
+        let size = withObservationTracking {
+            mirror.screenGeometry.size
+        } onChange: { [weak self] in
+            // Called before the change is made: read the new shape after it.
+            Task { @MainActor in self?.followScreenShape(of: mirror) }
+        }
+        fit(aspectRatio: size)
     }
 
     /// Gives the window the screen's proportions, keeping its center and the
@@ -81,29 +94,23 @@ final class PhoneWindow: NSWindow {
         let startMouse = NSEvent.mouseLocation
         let ratio = contentAspectRatio.height > 0 ? contentAspectRatio.width / contentAspectRatio.height : start.width / start.height
         let maxSize = screen?.visibleFrame.size ?? CGSize(width: CGFloat.infinity, height: .infinity)
+        let (sx, sy) = (edges.horizontal, edges.vertical)
 
         while let event = nextEvent(matching: [.leftMouseDragged, .leftMouseUp]), event.type == .leftMouseDragged {
-            let dx = NSEvent.mouseLocation.x - startMouse.x
-            let dy = NSEvent.mouseLocation.y - startMouse.y
-            let proposedWidth = start.width + (edges.contains(.right) ? dx : edges.contains(.left) ? -dx : 0)
-            let proposedHeight = start.height + (edges.contains(.top) ? dy : edges.contains(.bottom) ? -dy : 0)
+            let proposedWidth = start.width + sx * (NSEvent.mouseLocation.x - startMouse.x)
+            let proposedHeight = start.height + sy * (NSEvent.mouseLocation.y - startMouse.y)
 
             // Follow whichever dimension the mouse moved the most.
-            let followsWidth = edges.isDisjoint(with: [.top, .bottom])
-                || (!edges.isDisjoint(with: [.left, .right])
-                    && abs(proposedWidth / start.width - 1) >= abs(proposedHeight / start.height - 1))
+            let followsWidth = sy == 0
+                || (sx != 0 && abs(proposedWidth / start.width - 1) >= abs(proposedHeight / start.height - 1))
             var width = followsWidth ? proposedWidth : proposedHeight * ratio
             width = max(width, Self.minimumShortSide * max(1, ratio))
             width = min(width, maxSize.width, maxSize.height * ratio)
             let height = (width / ratio).rounded()
             width = width.rounded()
 
-            let x = edges.contains(.left) ? start.maxX - width
-                : edges.contains(.right) ? start.minX
-                : start.midX - width / 2
-            let y = edges.contains(.bottom) ? start.maxY - height
-                : edges.contains(.top) ? start.minY
-                : start.midY - height / 2
+            let x = sx < 0 ? start.maxX - width : sx > 0 ? start.minX : start.midX - width / 2
+            let y = sy < 0 ? start.maxY - height : sy > 0 ? start.minY : start.midY - height / 2
             setFrame(CGRect(x: x, y: y, width: width, height: height), display: true)
         }
         invalidateShadow()
@@ -118,6 +125,10 @@ private struct ResizeEdges: OptionSet {
     static let right = ResizeEdges(rawValue: 1 << 1)
     static let top = ResizeEdges(rawValue: 1 << 2)
     static let bottom = ResizeEdges(rawValue: 1 << 3)
+
+    /// Direction in which each axis grows: -1 (left, bottom), 1 (right, top) or 0.
+    var horizontal: CGFloat { contains(.left) ? -1 : contains(.right) ? 1 : 0 }
+    var vertical: CGFloat { contains(.bottom) ? -1 : contains(.top) ? 1 : 0 }
 }
 
 /// Hosts the window's content, with resize handles over its corners and
@@ -158,16 +169,16 @@ private final class ResizingView: NSView {
         let edge = Self.edgeThickness
         let b = bounds
         for handle in handles {
-            handle.frame = switch handle.edges {
-            case [.top, .left]: CGRect(x: b.minX, y: b.maxY - corner, width: corner, height: corner)
-            case [.top, .right]: CGRect(x: b.maxX - corner, y: b.maxY - corner, width: corner, height: corner)
-            case [.bottom, .left]: CGRect(x: b.minX, y: b.minY, width: corner, height: corner)
-            case [.bottom, .right]: CGRect(x: b.maxX - corner, y: b.minY, width: corner, height: corner)
-            case .top: CGRect(x: b.minX + corner, y: b.maxY - edge, width: b.width - 2 * corner, height: edge)
-            case .bottom: CGRect(x: b.minX + corner, y: b.minY, width: b.width - 2 * corner, height: edge)
-            case .left: CGRect(x: b.minX, y: b.minY + corner, width: edge, height: b.height - 2 * corner)
-            default: CGRect(x: b.maxX - edge, y: b.minY + corner, width: edge, height: b.height - 2 * corner)
-            }
+            // Corner handles are squares; edge handles span between them.
+            let (sx, sy) = (handle.edges.horizontal, handle.edges.vertical)
+            let width = sx == 0 ? b.width - 2 * corner : sy == 0 ? edge : corner
+            let height = sy == 0 ? b.height - 2 * corner : sx == 0 ? edge : corner
+            handle.frame = CGRect(
+                x: sx < 0 ? b.minX : sx > 0 ? b.maxX - width : b.minX + corner,
+                y: sy < 0 ? b.minY : sy > 0 ? b.maxY - height : b.minY + corner,
+                width: width,
+                height: height
+            )
         }
     }
 }
@@ -217,8 +228,8 @@ private final class ResizeHandle: NSView {
             }
             return .frameResize(position: position, directions: .all)
         }
-        return edges.isDisjoint(with: [.top, .bottom]) ? .resizeLeftRight
-            : edges.isDisjoint(with: [.left, .right]) ? .resizeUpDown
+        return edges.vertical == 0 ? .resizeLeftRight
+            : edges.horizontal == 0 ? .resizeUpDown
             : .crosshair
     }
 }

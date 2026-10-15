@@ -7,10 +7,11 @@ import Video
 final class AppDelegate: NSObject, NSApplicationDelegate {
     // Owned by the app rather than the window: the app keeps running when the
     // window is closed, and reopening it must find the same connection.
-    private let connection = ConnectionMonitor()
+    let connection = ConnectionMonitor()
     private lazy var window = PhoneWindow(connection: connection)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        connection.start()
         window.makeKeyAndOrderFront(nil)
     }
 

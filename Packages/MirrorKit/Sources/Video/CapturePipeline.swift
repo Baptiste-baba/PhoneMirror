@@ -25,6 +25,7 @@ final class CapturePipeline: NSObject, @unchecked Sendable {
 
     private let sessionQueue = DispatchQueue(label: "PhoneMirror.capture.session")
     private let videoQueue = DispatchQueue(label: "PhoneMirror.capture.video", qos: .userInteractive)
+    private let snapshotQueue = DispatchQueue(label: "PhoneMirror.capture.snapshot", qos: .utility)
 
     // sessionQueue only.
     private var deviceID: String?
@@ -34,7 +35,8 @@ final class CapturePipeline: NSObject, @unchecked Sendable {
     private var statistics: Statistics?
     private var frameCount = 0
     private var countingSince = ContinuousClock.now
-    private var lastSnapshot: ContinuousClock.Instant?
+
+    // snapshotQueue only.
     private let snapshotContext = CIContext(options: [.cacheIntermediates: false])
 
     /// - Parameters:
@@ -134,32 +136,31 @@ extension CapturePipeline: AVCaptureVideoDataOutputSampleBufferDelegate {
         }
         renderer.enqueue(sampleBuffer)
         updateStatistics(with: sampleBuffer)
-        takeSnapshotIfDue(of: sampleBuffer)
     }
 
     /// Keeps a recent picture of the screen to show, blurred, once the video
     /// stops. Nearly black frames are skipped: the screen goes black right
-    /// before the iPhone locks.
-    private func takeSnapshotIfDue(of sampleBuffer: CMSampleBuffer) {
-        guard lastSnapshot.map({ .now - $0 >= .seconds(1) }) ?? true,
-              let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        lastSnapshot = .now
-
+    /// before the iPhone locks. Rendered off `videoQueue`, so frames keep
+    /// flowing meanwhile.
+    private func takeSnapshot(of sampleBuffer: CMSampleBuffer) {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let frame = CIImage(cvPixelBuffer: pixelBuffer)
-        let scale = Self.snapshotWidth / frame.extent.width
-        let snapshot = frame.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        snapshotQueue.async { [self] in
+            let scale = Self.snapshotWidth / frame.extent.width
+            let small = frame.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+            guard let snapshot = snapshotContext.createCGImage(small, from: small.extent) else { return }
 
-        let average = snapshot.applyingFilter("CIAreaAverage", parameters: [
-            kCIInputExtentKey: CIVector(cgRect: snapshot.extent),
-        ])
-        var pixel = [UInt8](repeating: 0, count: 4)
-        snapshotContext.render(
-            average, toBitmap: &pixel, rowBytes: 4,
-            bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: nil
-        )
-        let brightness = (Int(pixel[0]) + Int(pixel[1]) + Int(pixel[2])) / 3
-        guard brightness > 12, let image = snapshotContext.createCGImage(snapshot, from: snapshot.extent) else { return }
-        onSnapshot(image)
+            // Measured on the snapshot rather than on the full frame again.
+            let average = CIImage(cgImage: snapshot).applyingFilter("CIAreaAverage")
+            var pixel = [UInt8](repeating: 0, count: 4)
+            snapshotContext.render(
+                average, toBitmap: &pixel, rowBytes: 4,
+                bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: nil
+            )
+            let brightness = (Int(pixel[0]) + Int(pixel[1]) + Int(pixel[2])) / 3
+            guard brightness > 12 else { return }
+            onSnapshot(snapshot)
+        }
     }
 
     /// Enough for a blurred background.
@@ -175,17 +176,15 @@ extension CapturePipeline: AVCaptureVideoDataOutputSampleBufferDelegate {
         let sizeChanged = statistics?.videoSize != size
         guard sizeChanged || elapsed >= .seconds(1) else { return }
 
-        let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) * 1e-18
         let current = Statistics(
             videoSize: size,
-            framesPerSecond: statistics == nil ? 0 : Double(frameCount) / seconds,
+            framesPerSecond: statistics == nil ? 0 : Double(frameCount) / (elapsed / .seconds(1)),
             pixelFormat: Self.fourCC(CMFormatDescriptionGetMediaSubType(format)),
             audioLevel: audioOutput.connections.first?.audioChannels.map(\.averagePowerLevel).max()
         )
         Logger.video.debug("""
             \(current.framesPerSecond, format: .fixed(precision: 1), privacy: .public) fps, \
-            audio \(current.audioLevel.map { "\($0) dB" } ?? "off", privacy: .public), \
-            audio connections \(self.audioOutput.connections.map { "active=\($0.isActive) enabled=\($0.isEnabled)" }, privacy: .public)
+            audio \(current.audioLevel.map { "\($0) dB" } ?? "off", privacy: .public)
             """)
         if sizeChanged {
             Logger.video.info("""
@@ -197,6 +196,7 @@ extension CapturePipeline: AVCaptureVideoDataOutputSampleBufferDelegate {
         frameCount = 0
         countingSince = .now
         onStatistics(current)
+        takeSnapshot(of: sampleBuffer)
     }
 
     private static func fourCC(_ code: FourCharCode) -> String {
